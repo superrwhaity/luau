@@ -1,0 +1,328 @@
+-- if you have any doubt about the script, this system is based on emergency respose atm robbery
+
+local ATM = game.ReplicatedStorage.ATM
+local CodeGenerator = ATM.CodeGenerator
+local ATM_CODES = {}
+local ATM_MAXIMUM_MISSES = 1
+local ATM_MAXIMUM_PLAYS = 3
+local ATM_COUNTDOWN_TIME = 60
+local TimeLeftText = "Time left: "
+local CodeLabel = "Code: "
+
+-- finds the uiStroke
+
+local function findUiStroke(folder)
+	for _, v in folder:GetChildren() do
+		if v:FindFirstChild("UIStroke") then
+			return v.UIStroke
+		end
+	end
+end
+
+-- this function is for change the UiStroke (code selection)
+
+local function changeCodeGui(plr: Player, actualCodeLabel)
+	if actualCodeLabel == 0 then
+		actualCodeLabel = 1
+	end
+	
+	local robScreen= plr.PlayerGui.ATM.Frame.RobScreen
+	local uiStroke = nil
+	
+	local oldTextLabel = robScreen.Codes:FindFirstChild("code"..actualCodeLabel - 1)
+
+	if oldTextLabel then
+		uiStroke = oldTextLabel.UIStroke
+	else
+		uiStroke = robScreen.Codes:FindFirstChild("code1"):FindFirstChild("UIStroke")
+		
+		if not uiStroke then
+			uiStroke = findUiStroke(robScreen.Codes)
+			uiStroke.Enabled = true
+		end
+	end
+
+	local codeTextLabel = robScreen.Codes:FindFirstChild("code"..actualCodeLabel)
+	uiStroke.Parent = codeTextLabel
+	uiStroke.Enabled = true
+end
+
+game.ReplicatedStorage.ATM.ChangeCode.OnServerEvent:Connect(changeCodeGui)
+
+-- this function is for when the player passes the miss limit
+
+local function closeATM(player:Player, atm)
+	local atmScreen = player.PlayerGui.ATM
+	local robScreen = atmScreen.Frame.RobScreen
+	
+	robScreen.Visible = false
+	robScreen.Parent.ATM.Value = " "
+	
+	local firewallScreen = atmScreen.Frame.FailedScreen
+	firewallScreen.Visible = true
+	
+	local atmModel = workspace.ATM:FindFirstChild(atm)
+	atmModel.Robbed.Value = true
+end
+
+-- start countdown
+
+local function startCountdown(player:Player, value, time1, atm_key)
+	value.Value = time1
+	
+	local clientTextLabel = player.PlayerGui.ATM.Frame.RobScreen.TimeLeft
+	
+	while true do
+		value.Value -= 1
+		
+		clientTextLabel.Text = TimeLeftText..value.Value
+		
+		if value.Value == 0 then
+			closeATM(player, atm_key)
+			break
+		elseif not game.ServerStorage.ATM:FindFirstChild(atm_key) then
+			break
+		end
+		task.wait(1)
+	end
+end
+
+game.ReplicatedStorage.ATM.StartCountdown.Event:Connect(startCountdown)
+
+local code = nil
+
+-- generate the hacking codes
+
+CodeGenerator.OnServerInvoke = function(plr: Player)
+	
+	local chip = plr.Backpack:FindFirstChild("Chip")
+	
+	if not chip then
+		plr:Kick("Rejoin the game.")
+		return
+	end
+	
+	chip:Destroy()
+	
+	local letters = {"Q","W","E","R","T","Y","U","I","O","P","A","S","D","F","G","H","J","K","L","Z","X","C","V","B","N","M"}
+	local codeTable = {}
+
+	local function getCode()
+		local code = letters[math.random(1, #letters)]..math.random(100, 999)
+
+		return code
+	end
+
+	local function getRandomColor()
+		local color = Color3.fromRGB(math.random(1, 255), math.random(1, 255), math.random(1, 255))
+		return color
+	end
+
+	local codes = plr.PlayerGui.ATM.Frame.RobScreen.Codes
+	local codesTable = {}
+
+	for _, v in codes:GetChildren() do
+		table.insert(codesTable, v)
+	end
+
+	local codeQuantity = table.maxn(codesTable)
+
+	while true do
+		codeQuantity -= 1
+		local textLabel = codesTable[math.random(1,#codesTable)]
+		textLabel.Text = getCode()
+		textLabel.TextColor3 = getRandomColor()
+
+		table.remove(codesTable, table.find(codesTable, textLabel))
+
+		if codeQuantity == 0 then
+			break
+		end
+	end
+
+	local ATM_KEY = plr.PlayerGui.ATM.Frame.ATM
+
+	local robberyBool = codes.Parent.RobberyStarted
+
+	local atmFolder = Instance.new("StringValue")
+	atmFolder.Name = ATM_KEY.Value
+	atmFolder.Parent = game.ServerStorage.ATM
+
+	local atmCodesFolder = Instance.new("Folder")
+	atmCodesFolder.Name = "Codes"
+	atmCodesFolder.Parent = atmFolder
+
+	local robberyCode = Instance.new("StringValue")
+	robberyCode.Parent = atmFolder
+	robberyCode.Name = "robberyCode"
+	robberyCode.Value = ATM_KEY.Value
+
+	local missesValue = Instance.new("IntValue")
+	missesValue.Parent = atmFolder
+	missesValue.Name = "Misses"
+	
+	local playsValue = Instance.new("IntValue")
+	playsValue.Name = "Plays"
+	playsValue.Parent = atmFolder
+	
+	local withdrawMoney = Instance.new("IntValue")
+	withdrawMoney.Name = "WithdrawMoney"
+	withdrawMoney.Parent = atmFolder
+	
+	local countdown = Instance.new("IntValue")
+	countdown.Name = "Countdown"
+	countdown.Parent = atmFolder
+	
+	local startCountdown = ATM.StartCountdown
+	startCountdown:Fire(plr, countdown, ATM_COUNTDOWN_TIME, robberyCode.Value)
+
+	return robberyCode.Value
+end
+
+-- select codes for hack the atm
+
+game.ReplicatedStorage.ATM.CodeGenerator2.OnServerEvent:Connect(function(plr: Player, atm_key)
+	local robberyScreen = plr.PlayerGui.ATM.Frame.RobScreen
+	local labels = {}
+	
+	for _, v in robberyScreen.Codes:GetChildren() do
+		table.insert(labels, v)
+	end
+
+	local codes = {}
+	
+	while true do
+		local code = labels[math.random(1, #labels)]
+		table.insert(codes, code.Text)
+		table.remove(labels, table.find(labels, code))
+		
+		if table.maxn(codes) == ATM_MAXIMUM_PLAYS then
+			break
+		end
+	end
+	
+	local n = 0
+	
+	for _, v in codes do
+		local stringValue = Instance.new("StringValue")
+		stringValue.Name = "Code"..n
+		stringValue.Value = v
+		stringValue.Parent = game.ServerStorage.ATM:FindFirstChild(atm_key).Codes
+		n += 1
+	end
+end)
+
+-- withdraw money and enable alarm
+
+local count = 0
+
+function withdraw(plr:Player, atm_key)
+	count += 1
+	
+	local atmScreen = plr.PlayerGui.ATM
+	
+	local atm_key = atmScreen.Frame.ATM
+	local atm = game.Workspace.ATM:FindFirstChild(atm_key.Value)
+	atm.Robbed.Value = true
+	
+	local withdrawScreen = atmScreen.Frame.WithdrawScreen
+	local withdrawButton = withdrawScreen.WithdrawButton
+	
+	local screenManager = game.ReplicatedStorage.ATM.ScreenManager
+	
+	screenManager:FireClient(plr, atmScreen.Frame.RobScreen, false)
+	screenManager:FireClient(plr, withdrawScreen, true)
+	
+	withdrawButton.MouseButton1Click:Wait()
+	
+	local screenManager = game.ReplicatedStorage.ATM.ScreenManager
+	
+	screenManager:FireClient(plr, atmScreen, false)
+	
+	local withdrawMoney = game.ServerStorage.ATM:FindFirstChild(atm_key.Value).WithdrawMoney
+	local plrMoney = plr.leaderstats.Money
+	
+	plrMoney.Value += withdrawMoney.Value
+	
+	withdrawMoney.Parent:Destroy()
+end
+
+
+game.ReplicatedStorage.ATM.WithdrawMoney.OnServerInvoke = withdraw
+
+-- verify code
+
+game.ReplicatedStorage.ATM.VerifyCode.OnServerInvoke = function(plr: Player, atm_key, serverCode)
+	local atmFolder = game.ServerStorage.ATM:FindFirstChild(atm_key)
+	local plays = atmFolder:FindFirstChild("Plays")
+	local code = atmFolder:FindFirstChild("Codes"):FindFirstChild("Code"..plays.Value)
+	plays.Value += 1
+	local label = nil
+	local misses = atmFolder:FindFirstChild("Misses")
+	for _, v in plr.PlayerGui.ATM.Frame.RobScreen.Codes:GetChildren() do
+		if v:FindFirstChild("UIStroke") then
+			label = v
+			if label.Text ~= code.Value then
+				misses.Value += 1
+				if misses.Value > ATM_MAXIMUM_MISSES then
+					local atmScreen2 = plr.PlayerGui.ATM.Frame
+
+					local robScreen = atmScreen2.RobScreen
+					local failedScreen = atmScreen2.FailedScreen
+					
+					local screenManager = game.ReplicatedStorage.ATM.ScreenManager
+					
+					local atm = workspace.ATM:FindFirstChild(atm_key)
+					atm.Robbed.Value = true
+					
+					local failedScreen = plr.PlayerGui.ATM.Frame.FailedScreen
+					
+					screenManager:FireClient(plr, failedScreen, true)
+					
+					failedScreen.ExitButton.MouseButton1Click:Wait()
+					
+					game.ServerStorage.ATM:FindFirstChild(atm_key):Destroy()
+					
+					return "Maximum misses reached."
+				else
+					return false
+				end
+			else
+				if plays.Value == ATM_MAXIMUM_PLAYS then
+					local atmScreen = plr.PlayerGui.ATM.Frame
+					local atm = workspace.ATM:FindFirstChild(atmScreen.ATM.Value)
+					atm.Robbed.Value = true
+
+					local withdrawMoney = game.ServerStorage.ATM:FindFirstChild(atm_key):FindFirstChild("WithdrawMoney")
+					
+					withdrawMoney.Value = math.random(5230, 7500)
+					withdraw(plr, atm_key)
+					
+					break
+				else
+					return "Correct"
+				end
+			end
+		end
+	end
+end
+
+-- change code
+
+game.ReplicatedStorage.ATM.ChangeTextLabel.OnServerEvent:Connect(function(plr, textLabel, value)
+	local atm_key = plr.PlayerGui.ATM.Frame.ATM
+	
+	local folder = game.ServerStorage.ATM:FindFirstChild(atm_key.Value)
+	
+	if folder == nil then
+		return
+	end
+	
+	local code = folder:FindFirstChild("Codes"):FindFirstChild("Code"..value)
+	
+	if code == nil then
+		return
+	end
+	
+	textLabel.Text = CodeLabel..code.Value..""
+end)
