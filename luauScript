@@ -1,22 +1,15 @@
 local ATM = game.ReplicatedStorage.ATM
-local CodeGenerator = ATM.CodeGenerator
-local ATM_CODES = {}
 local ATM_MAXIMUM_MISSES = 1
 local ATM_MAXIMUM_PLAYS = 3
 local ATM_COUNTDOWN_TIME = 60
 
-local function onPlayerAdded(plr: Player)
-	local codeValue = Instance.new("StringValue")
-	codeValue.Name = "CodeValue"
-	codeValue.Parent = plr
-	
-	local countdownValue = Instance.new("IntValue")
-	countdownValue.Name = "CountdownValue"
-	countdownValue.Parent = plr
-end
-
-game.Players.PlayerAdded:Connect(onPlayerAdded)
-
+local CodeGenerator = ATM.CodeGenerator
+local ChangeCode = ATM.ChangeCode
+local StartCountdown = ATM.StartCountdown
+local CodeGenerator2 = ATM.CodeGenerator2
+local WithdrawMoney = ATM.WithdrawMoney
+local VerifyCode = ATM.VerifyCode
+local ChangeCurrentCode = ATM.ChangeTextLabel
 -- find player uiStroke
 
 local function findUiStroke(folder)
@@ -55,7 +48,7 @@ local function changeCodeGui(plr: Player, actualCodeLabel)
 	uiStroke.Enabled = true
 end
 
-game.ReplicatedStorage.ATM.ChangeCode.OnServerEvent:Connect(changeCodeGui)
+ChangeCode.OnServerEvent:Connect(changeCodeGui)
 
 -- this function is for when player passes the miss limit
 
@@ -95,7 +88,7 @@ local function startCountdown(player:Player, value, time1, atm_key)
 	end
 end
 
-game.ReplicatedStorage.ATM.StartCountdown.Event:Connect(startCountdown)
+StartCountdown.Event:Connect(startCountdown)
 
 local code = nil
 
@@ -196,15 +189,19 @@ end
 
 -- hacking codes selection
 
-game.ReplicatedStorage.ATM.CodeGenerator2.OnServerEvent:Connect(function(plr: Player, atm_key)
+CodeGenerator2.OnServerEvent:Connect(function(plr: Player, atm_key)
 	local robberyScreen = plr.PlayerGui.ATM.Frame.RobScreen
 	local labels = {}
+	
+	-- get labels
 	
 	for _, v in robberyScreen.Codes:GetChildren() do
 		table.insert(labels, v)
 	end
 
 	local codes = {}
+	
+	-- creates a looping to get random codes
 	
 	while true do
 		local code = labels[math.random(1, #labels)]
@@ -218,6 +215,8 @@ game.ReplicatedStorage.ATM.CodeGenerator2.OnServerEvent:Connect(function(plr: Pl
 	
 	local n = 0
 	
+	-- create values to verify codes then
+	
 	for _, v in codes do
 		local stringValue = Instance.new("StringValue")
 		stringValue.Name = "Code"..n
@@ -227,13 +226,9 @@ game.ReplicatedStorage.ATM.CodeGenerator2.OnServerEvent:Connect(function(plr: Pl
 	end
 end)
 
-
-local count = 0
-
 -- enable atm alarms, manage some frames and withdraw money 
 
 function withdraw(plr:Player, atm_key)
-	count += 1
 	
 	local atmScreen = plr.PlayerGui.ATM
 	
@@ -255,6 +250,8 @@ function withdraw(plr:Player, atm_key)
 	
 	screenManager:FireClient(plr, atmScreen, false)
 	
+	-- finds the withdraw value. (only gets a value after finishing the hacking, also with a server verification)
+	
 	local withdrawMoney = game.ServerStorage.ATM:FindFirstChild(atm_key.Value).WithdrawMoney
 	local plrMoney = plr.leaderstats.Money
 	
@@ -263,18 +260,19 @@ function withdraw(plr:Player, atm_key)
 	withdrawMoney.Parent:Destroy()
 end
 
-
-game.ReplicatedStorage.ATM.WithdrawMoney.OnServerInvoke = withdraw
+WithdrawMoney.OnServerInvoke = withdraw
 
 -- verify hacking code
 
-game.ReplicatedStorage.ATM.VerifyCode.OnServerInvoke = function(plr: Player, atm_key, serverCode)
+VerifyCode.OnServerInvoke = function(plr: Player, atm_key, serverCode)
 	local atmFolder = game.ServerStorage.ATM:FindFirstChild(atm_key)
 	local plays = atmFolder:FindFirstChild("Plays")
 	local code = atmFolder:FindFirstChild("Codes"):FindFirstChild("Code"..plays.Value)
 	plays.Value += 1
 	local label = nil
 	local misses = atmFolder:FindFirstChild("Misses")
+	
+	-- get each robscreen codes, then find uiStroke which is the code that player selected and then verify with the current value predefinied by the server
 	for _, v in plr.PlayerGui.ATM.Frame.RobScreen.Codes:GetChildren() do
 		if v:FindFirstChild("UIStroke") then
 			label = v
@@ -325,7 +323,7 @@ end
 
 -- change the current hacking code
 
-game.ReplicatedStorage.ATM.ChangeTextLabel.OnServerEvent:Connect(function(plr, textLabel, value)
+ChangeCurrentCode.OnServerEvent:Connect(function(plr, textLabel, value)
 	local atm_key = plr.PlayerGui.ATM.Frame.ATM
 	
 	local folder = game.ServerStorage.ATM:FindFirstChild(atm_key.Value)
