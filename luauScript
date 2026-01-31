@@ -10,8 +10,8 @@ local CodeGenerator2 = ATM.CodeGenerator2
 local WithdrawMoney = ATM.WithdrawMoney
 local VerifyCode = ATM.VerifyCode
 local ChangeCurrentCode = ATM.ChangeTextLabel
--- find player uiStroke
 
+-- find gui uiStroke
 local function findUiStroke(folder)
 	for _, v in folder:GetChildren() do
 		if v:FindFirstChild("UIStroke") then
