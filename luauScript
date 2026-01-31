@@ -1,15 +1,23 @@
--- if you have any doubt about the script, this system is based on emergency respose atm robbery
-
 local ATM = game.ReplicatedStorage.ATM
 local CodeGenerator = ATM.CodeGenerator
 local ATM_CODES = {}
 local ATM_MAXIMUM_MISSES = 1
 local ATM_MAXIMUM_PLAYS = 3
 local ATM_COUNTDOWN_TIME = 60
-local TimeLeftText = "Time left: "
-local CodeLabel = "Code: "
 
--- finds the uiStroke
+local function onPlayerAdded(plr: Player)
+	local codeValue = Instance.new("StringValue")
+	codeValue.Name = "CodeValue"
+	codeValue.Parent = plr
+	
+	local countdownValue = Instance.new("IntValue")
+	countdownValue.Name = "CountdownValue"
+	countdownValue.Parent = plr
+end
+
+game.Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- find player uiStroke
 
 local function findUiStroke(folder)
 	for _, v in folder:GetChildren() do
@@ -19,7 +27,7 @@ local function findUiStroke(folder)
 	end
 end
 
--- this function is for change the UiStroke (code selection)
+-- change player code selection
 
 local function changeCodeGui(plr: Player, actualCodeLabel)
 	if actualCodeLabel == 0 then
@@ -49,7 +57,7 @@ end
 
 game.ReplicatedStorage.ATM.ChangeCode.OnServerEvent:Connect(changeCodeGui)
 
--- this function is for when the player passes the miss limit
+-- this function is for when player passes the miss limit
 
 local function closeATM(player:Player, atm)
 	local atmScreen = player.PlayerGui.ATM
@@ -65,7 +73,7 @@ local function closeATM(player:Player, atm)
 	atmModel.Robbed.Value = true
 end
 
--- start countdown
+-- start atm countdown
 
 local function startCountdown(player:Player, value, time1, atm_key)
 	value.Value = time1
@@ -75,7 +83,7 @@ local function startCountdown(player:Player, value, time1, atm_key)
 	while true do
 		value.Value -= 1
 		
-		clientTextLabel.Text = TimeLeftText..value.Value
+		clientTextLabel.Text = "Time left: "..value.Value
 		
 		if value.Value == 0 then
 			closeATM(player, atm_key)
@@ -91,7 +99,7 @@ game.ReplicatedStorage.ATM.StartCountdown.Event:Connect(startCountdown)
 
 local code = nil
 
--- generate the hacking codes
+-- generate and put the codes on labels, and also exclude the chip
 
 CodeGenerator.OnServerInvoke = function(plr: Player)
 	
@@ -106,14 +114,16 @@ CodeGenerator.OnServerInvoke = function(plr: Player)
 	
 	local letters = {"Q","W","E","R","T","Y","U","I","O","P","A","S","D","F","G","H","J","K","L","Z","X","C","V","B","N","M"}
 	local codeTable = {}
-
+	
 	local function getCode()
+		-- randomize a letter and then concaternate with a number, generating the code
 		local code = letters[math.random(1, #letters)]..math.random(100, 999)
 
 		return code
 	end
 
 	local function getRandomColor()
+		-- get a random color
 		local color = Color3.fromRGB(math.random(1, 255), math.random(1, 255), math.random(1, 255))
 		return color
 	end
@@ -126,7 +136,9 @@ CodeGenerator.OnServerInvoke = function(plr: Player)
 	end
 
 	local codeQuantity = table.maxn(codesTable)
-
+	
+	-- creates a looping to insert the codes in textLabel.Text
+	
 	while true do
 		codeQuantity -= 1
 		local textLabel = codesTable[math.random(1,#codesTable)]
@@ -139,7 +151,9 @@ CodeGenerator.OnServerInvoke = function(plr: Player)
 			break
 		end
 	end
-
+	
+	-- create the necessary values to make atm work
+	
 	local ATM_KEY = plr.PlayerGui.ATM.Frame.ATM
 
 	local robberyBool = codes.Parent.RobberyStarted
@@ -174,12 +188,13 @@ CodeGenerator.OnServerInvoke = function(plr: Player)
 	countdown.Parent = atmFolder
 	
 	local startCountdown = ATM.StartCountdown
+	-- a bindable event that start countdown in client
 	startCountdown:Fire(plr, countdown, ATM_COUNTDOWN_TIME, robberyCode.Value)
 
 	return robberyCode.Value
 end
 
--- select codes for hack the atm
+-- hacking codes selection
 
 game.ReplicatedStorage.ATM.CodeGenerator2.OnServerEvent:Connect(function(plr: Player, atm_key)
 	local robberyScreen = plr.PlayerGui.ATM.Frame.RobScreen
@@ -212,9 +227,10 @@ game.ReplicatedStorage.ATM.CodeGenerator2.OnServerEvent:Connect(function(plr: Pl
 	end
 end)
 
--- withdraw money and enable alarm
 
 local count = 0
+
+-- enable atm alarms, manage some frames and withdraw money 
 
 function withdraw(plr:Player, atm_key)
 	count += 1
@@ -250,7 +266,7 @@ end
 
 game.ReplicatedStorage.ATM.WithdrawMoney.OnServerInvoke = withdraw
 
--- verify code
+-- verify hacking code
 
 game.ReplicatedStorage.ATM.VerifyCode.OnServerInvoke = function(plr: Player, atm_key, serverCode)
 	local atmFolder = game.ServerStorage.ATM:FindFirstChild(atm_key)
@@ -307,7 +323,7 @@ game.ReplicatedStorage.ATM.VerifyCode.OnServerInvoke = function(plr: Player, atm
 	end
 end
 
--- change code
+-- change the current hacking code
 
 game.ReplicatedStorage.ATM.ChangeTextLabel.OnServerEvent:Connect(function(plr, textLabel, value)
 	local atm_key = plr.PlayerGui.ATM.Frame.ATM
@@ -324,5 +340,5 @@ game.ReplicatedStorage.ATM.ChangeTextLabel.OnServerEvent:Connect(function(plr, t
 		return
 	end
 	
-	textLabel.Text = CodeLabel..code.Value..""
+	textLabel.Text = "Current code: "..code.Value..""
 end)
